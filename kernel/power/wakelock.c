@@ -184,7 +184,7 @@ static struct wakelock *wakelock_lookup_add(const char *name, size_t len,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	wl->ws = wakeup_source_register(NULL, wl->name);
+	wl->ws = wakeup_source_register(wl->name);
 	if (!wl->ws) {
 		kfree(wl->name);
 		kfree(wl);
@@ -237,7 +237,7 @@ int pm_wake_lock(const char *buf)
 		do_div(timeout_ms, NSEC_PER_MSEC);
 		__pm_wakeup_event(wl->ws, timeout_ms);
 	} else {
-		__pm_wakeup_event(&wl->ws, 500);
+		__pm_wakeup_event(wl->ws, 500);
 	}
 
 	wakelocks_lru_most_recent(wl);
