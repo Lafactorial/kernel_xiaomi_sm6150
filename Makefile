@@ -920,13 +920,8 @@ LDFLAGS		+= --thinlto-cache-dir=.thinlto-cache
 else
 lto-clang-flags	:= -flto
 endif
-lto-clang-flags += -fvisibility=default $(call cc-option, -fsplit-lto-unit)
-
-# Limit inlining across translation units to reduce binary size
-LD_FLAGS_LTO_CLANG := -mllvm -import-instr-limit=5
-
-KBUILD_LDFLAGS += $(LD_FLAGS_LTO_CLANG)
-KBUILD_LDFLAGS_MODULE += $(LD_FLAGS_LTO_CLANG)
+KBUILD_CFLAGS	+= -mllvm -unroll-threshold=1200
+lto-clang-flags += -fvisibility=hidden
 
 KBUILD_LDFLAGS_MODULE += -T scripts/module-lto.lds
 
