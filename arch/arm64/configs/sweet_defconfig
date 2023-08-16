@@ -4865,6 +4865,7 @@ CONFIG_QTI_CRYPTO_TZ=y
 # CONFIG_SUNXI_SRAM is not set
 # CONFIG_SOC_TI is not set
 CONFIG_PM_DEVFREQ=y
+# CONFIG_QCOM_RTIC is not set
 
 #
 # DEVFREQ Governors
