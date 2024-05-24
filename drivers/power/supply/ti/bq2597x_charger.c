@@ -707,6 +707,7 @@ static int bq2597x_set_busovp_alarm_th(struct bq2597x *bq, int threshold)
 
 	if (threshold < BQ2597X_BUS_OVP_ALM_BASE)
 		threshold = BQ2597X_BUS_OVP_ALM_BASE;
+
 	val = (threshold - BQ2597X_BUS_OVP_ALM_BASE) / BQ2597X_BUS_OVP_ALM_LSB;
 
 	val <<= BQ2597X_BUS_OVP_ALM_SHIFT;
@@ -1056,7 +1057,7 @@ static int bq2597x_get_adc_data(struct bq2597x *bq, int channel,  int *result)
 
 	if (bq->chip_vendor == SC8551) {
 		kernel_neon_begin();
-		if (bq->hw_version == HARDWARE_PLATFORM_COURBET && bq->mass_production)
+		if (bq->mass_production)
 			*result = (int)(t * sc8551_adc_lsb_non_calibrate[channel]);
 		else
 			*result = (int)(t * sc8551_adc_lsb[channel]);
@@ -1407,7 +1408,7 @@ static int bq2597x_detect_device(struct bq2597x *bq)
 		bq->part_no >>= BQ2597X_DEV_ID_SHIFT;
 	}
 
-	if (data == SC8551_DEVICE_ID || (data == SC8551A_DEVICE_ID))
+	if (data == SC8551_DEVICE_ID)
 		bq->chip_vendor = SC8551;
 	else if (data == BQ25968_DEVICE_ID)
 		bq->chip_vendor = BQ25968;
@@ -1578,18 +1579,7 @@ static int bq2597x_parse_dt(struct bq2597x *bq, struct device *dev)
 		bq->bypass_mode_enable = (int)bq->cfg->sc8551_bypass_enable;
 	}
 
-	if (bq->hw_version == HARDWARE_PLATFORM_COURBET) {
-		if (bq->chip_vendor == SC8551) {
-			if (bq->mass_production)
-				ret = of_property_read_u32(np, "mp-sc-vbat-calibrate", &bq->vbat_calibrate);
-			else
-				ret = of_property_read_u32(np, "pre-mp-sc-vbat-calibrate", &bq->vbat_calibrate);
-		} else {
-			ret = of_property_read_u32(np, "ti-vbat-calibrate", &bq->vbat_calibrate);
-		}
-	} else {
-		bq->vbat_calibrate = 0;
-	}
+	bq->vbat_calibrate = 0;
 
 	if (ret) {
 		bq_err("failed to read vbat_calibrate\n");
@@ -1709,7 +1699,7 @@ static int bq2597x_init_protection(struct bq2597x *bq)
 	ret = bq2597x_set_acovp_th(bq, bq->cfg->ac_ovp_th);
 	bq_info("set ac ovp threshold %d %s\n", bq->cfg->ac_ovp_th,
 		!ret ? "successfully" : "failed");
-	bq2597x_dump_reg(bq);
+
 	return 0;
 }
 
@@ -2043,7 +2033,17 @@ static int bq2597x_charger_get_property(struct power_supply *psy,
 		val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_MODEL_NAME:
-		val->strval = "bq2597x-master";
+		ret = bq2597x_get_work_mode(bq, &bq->mode);
+		if (ret) {
+			val->strval = "unknown";
+		} else {
+			if (bq->mode == BQ25970_ROLE_MASTER)
+				val->strval = "bq2597x-master";
+			else if (bq->mode == BQ25970_ROLE_SLAVE)
+				val->strval = "bq2597x-slave";
+			else
+				val->strval = "bq2597x-standalone";
+		}
 		break;
 	case POWER_SUPPLY_PROP_TI_BUS_ERROR_STATUS:
 		val->intval = bq2597x_check_vbus_error_status(bq);
@@ -2056,7 +2056,6 @@ static int bq2597x_charger_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CP_VBAT_CALIBRATE:
 		val->intval = bq->vbat_calibrate;
-		break;
 	default:
 		return -EINVAL;
 
@@ -2121,7 +2120,14 @@ static int bq2597x_psy_register(struct bq2597x *bq)
 {
 	bq->psy_cfg.drv_data = bq;
 	bq->psy_cfg.of_node = bq->dev->of_node;
-	bq->psy_desc.name = "bq2597x-master";
+
+	if (bq->mode == BQ25970_ROLE_MASTER)
+		bq->psy_desc.name = "bq2597x-master";
+	else if (bq->mode == BQ25970_ROLE_SLAVE)
+		bq->psy_desc.name = "bq2597x-slave";
+	else
+		bq->psy_desc.name = "bq2597x-standalone";
+
 	bq->psy_desc.type = POWER_SUPPLY_TYPE_MAINS;
 	bq->psy_desc.properties = bq2597x_charger_props;
 	bq->psy_desc.num_properties = ARRAY_SIZE(bq2597x_charger_props);
@@ -2346,7 +2352,12 @@ static const struct file_operations reg_debugfs_ops = {
 
 static void create_debugfs_entry(struct bq2597x *bq)
 {
-	bq->debug_root = debugfs_create_dir("bq2597x-master", NULL);
+	if (bq->mode == BQ25970_ROLE_MASTER)
+		bq->debug_root = debugfs_create_dir("bq2597x-master", NULL);
+	else if (bq->mode == BQ25970_ROLE_SLAVE)
+		bq->debug_root = debugfs_create_dir("bq2597x-slave", NULL);
+	else
+		bq->debug_root = debugfs_create_dir("bq2597x-standalone", NULL);
 
 	if (!bq->debug_root)
 		bq_err("Failed to create debug dir\n");
@@ -2369,8 +2380,17 @@ static void create_debugfs_entry(struct bq2597x *bq)
 
 static struct of_device_id bq2597x_charger_match_table[] = {
 	{
-		.compatible = "ti,bq2597x-master",
+		.compatible = "ti,bq2597x-standalone",
 		.data = &bq2597x_mode_data[BQ25970_STDALONE],
+	},
+	{
+		.compatible = "ti,bq2597x-master",
+		.data = &bq2597x_mode_data[BQ25970_MASTER],
+	},
+
+	{
+		.compatible = "ti,bq2597x-slave",
+		.data = &bq2597x_mode_data[BQ25970_SLAVE],
 	},
 	{},
 };
@@ -2534,6 +2554,7 @@ static int bq2597x_resume(struct device *dev)
 	}
 
 	bq2597x_enable_adc(bq, true);
+	power_supply_changed(bq->fc2_psy);
 	bq_err("Resume successfully!");
 
 	return 0;
