@@ -663,7 +663,7 @@ out:
 	return ret;
 }
 
-static void uvcg_control_class_drop_link(struct config_item *src,
+static int uvcg_control_class_drop_link(struct config_item *src,
 					struct config_item *target)
 {
 	struct config_item *control, *header;
@@ -696,6 +696,7 @@ unlock:
 out:
 	config_item_put(header);
 	mutex_unlock(su_mutex);
+	return 0;
 }
 
 static struct configfs_item_operations uvcg_control_class_item_ops = {
@@ -935,7 +936,7 @@ out:
 	return ret;
 }
 
-static void uvcg_streaming_header_drop_link(struct config_item *src,
+static int uvcg_streaming_header_drop_link(struct config_item *src,
 					   struct config_item *target)
 {
 	struct mutex *su_mutex = &src->ci_group->cg_subsys->su_mutex;
@@ -970,6 +971,7 @@ static void uvcg_streaming_header_drop_link(struct config_item *src,
 out:
 	mutex_unlock(&opts->lock);
 	mutex_unlock(su_mutex);
+	return 0;
 }
 
 static struct configfs_item_operations uvcg_streaming_header_item_ops = {
@@ -2211,7 +2213,7 @@ out:
 	return ret;
 }
 
-static void uvcg_streaming_class_drop_link(struct config_item *src,
+static int uvcg_streaming_class_drop_link(struct config_item *src,
 					  struct config_item *target)
 {
 	struct config_item *streaming, *header;
@@ -2249,6 +2251,7 @@ unlock:
 out:
 	config_item_put(header);
 	mutex_unlock(su_mutex);
+	return 0;
 }
 
 static struct configfs_item_operations uvcg_streaming_class_item_ops = {
