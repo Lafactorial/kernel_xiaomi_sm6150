@@ -43,3 +43,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         path: ${{ steps.build.outputs.outfile }}
+        compression-level: 0
