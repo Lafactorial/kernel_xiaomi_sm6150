@@ -2,11 +2,12 @@ name: Build
 
 on:
   workflow_dispatch:
-    # Inputs the workflow accepts
+  push:
+  pull_request:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout kernel source
       uses: actions/checkout@v2
