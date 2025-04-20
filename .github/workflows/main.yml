@@ -42,5 +42,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        path: ${{ steps.build.outputs.outfile }}
+        path: zipper/Vantom*.zip
         compression-level: 0
