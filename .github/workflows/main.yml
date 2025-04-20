@@ -37,7 +37,7 @@ jobs:
         to: ${{ secrets.CHANNEL_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         message: Kernel is built!, took ${{ steps.build.outputs.elapsed_time }} seconds.
-        document: ${{ github.workspace }}/${{ steps.build.outputs.outfile }}
+        document: ${{ github.workspace }}/${{ steps.build.outputs.outfile }}.zip
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
