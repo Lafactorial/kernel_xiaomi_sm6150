@@ -2,7 +2,8 @@ name: Build
 
 on:
   workflow_dispatch:
-    # Inputs the workflow accepts
+  push:
+  pull_request:
 
 jobs:
   build:
@@ -21,10 +22,10 @@ jobs:
         path: zipper
 
     - name: Android kernel build
-      uses: Lafactorial/android-kernel-actions@master
+      uses: Keinamvy/android-kernel-actions@master
       id: build
       env:
-        NAME: VantomKernel
+        NAME: VantomKernel_KSU
       with:
         arch: arm64
         compiler: clang/15
@@ -37,4 +38,14 @@ jobs:
         to: ${{ secrets.CHANNEL_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         message: Kernel is built!, took ${{ steps.build.outputs.elapsed_time }} seconds.
-        document: ${{ steps.build.outputs.outfile }}
+        document: ${{ github.workspace }}/${{ steps.build.outputs.outfile }}.zip
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        path: |
+          zipper/
+          !zipper/.gitignore
+          !zipper/README.md
+        compression-level: 9
+        name: ${{ steps.build.outputs.outfile }}
