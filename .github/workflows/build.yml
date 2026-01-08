@@ -1,0 +1,117 @@
+name: build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rom_type: MIUI
+            ksu_type: KSU
+          - rom_type: MIUI
+            ksu_type: NON_KSU
+          - rom_type: AOSP
+            ksu_type: KSU
+          - rom_type: AOSP
+            ksu_type: NON_KSU
+
+    env:
+      ROM_TYPE: ${{ matrix.rom_type }}
+      KSU_TYPE: ${{ matrix.ksu_type }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Prepare timezone
+        run: |
+          echo "BUILD_TIME=$(TZ=Asia/Jakarta date '+%d%m%Y-%H%M')" >> $GITHUB_ENV
+          sudo rm /etc/localtime
+          sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -qq -y
+          sudo apt-get install -qq -y bc bison build-essential ccache cpio curl flex git libelf-dev libssl-dev \
+              libncurses5-dev lld lzma python3 unzip wget xz-utils zip jq zstd libxml2-dev \
+              gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu >/dev/null 2>&1
+
+      - name: Fetch Toolchains
+        run: |
+          mkdir -p clang && cd clang
+          curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
+          chmod a+x antman
+          ./antman -S --noprogress || true
+          ./antman --patch=glibc || true
+          cd ..
+          git clone https://github.com/greenforce-project/gcc-arm -b main --depth=1 "gcc32"
+          git clone https://github.com/greenforce-project/gcc-arm64 -b main --depth=1 "gcc64"
+
+      - name: Apply build type
+        run: |
+          if [ "$KSU_TYPE" = "NON_KSU" ]; then
+            sed -i 's/^CONFIG_KSU=y/CONFIG_KSU=n/' arch/arm64/configs/sweet_defconfig
+          fi
+
+          apply_panel_dimensions() {
+              local w=$1 h=$2
+              local files=(
+                  "arch/arm64/boot/dts/qcom/xiaomi/sweet/dsi-panel-k6-38-0e-0b-fhd-dsc-video.dtsi"
+                  "arch/arm64/boot/dts/qcom/xiaomi/sweet/dsi-panel-k6-38-0c-0a-fhd-dsc-video.dtsi"
+              )
+              echo -e "${CYAN}Setting panel size → ${w} × ${h} mm${NC}"
+              for f in "${files[@]}"; do
+                  [ -f "$f" ] && sed -i "s/\(qcom,mdss-pan-physical-width-dimension[[:space:]]*=[[:space:]]*< *\)[0-9]\+/\1${w}/" "$f"
+                  [ -f "$f" ] && sed -i "s/\(qcom,mdss-pan-physical-height-dimension[[:space:]]*=[[:space:]]*< *\)[0-9]\+/\1${h}/" "$f"
+              done
+          }
+          if [ "$ROM_TYPE" = "MIUI" ]; then
+            apply_panel_dimensions 695 1546
+          else
+            apply_panel_dimensions 70 155
+          fi
+
+      - name: Build Kernel
+        run: |
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export PATH="${PWD}/clang/bin:${PWD}/gcc64/bin:${PWD}/gcc32/bin:${PATH}"
+          export KBUILD_BUILD_HOST=Ubuntu
+          export KBUILD_BUILD_USER=Keinamvy
+          export LLVM=1 LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export USE_CCACHE=1
+          ccache -M 50G >/dev/null 2>&1 || true
+          export KCFLAGS="-O3"
+          export LTO=thin
+          make O=out sweet_defconfig
+          make -j$(nproc --all) O=out \
+            CC=clang LD=ld.lld NM=llvm-nm OBJCOPY=llvm-objcopy
+          mv out/.config out/defconfig.txt
+
+      - name: Upload defconfig
+        uses: actions/upload-artifact@v4
+        with:
+          name: defconfig-${{ env.ROM_TYPE }}-${{ env.KSU_TYPE }}-${{ env.BUILD_TIME }}
+          path: out/*.txt
+
+      - name: Fetch AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/MiDoNaSR545/anykernel3 -b main AnyKernel3
+          cp out/arch/arm64/boot/Image.gz AnyKernel3/
+          cp out/arch/arm64/boot/dtbo.img AnyKernel3/
+
+      - name: Upload Kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeMeDo-${{ env.ROM_TYPE }}-${{ env.KSU_TYPE }}-${{ env.BUILD_TIME }}
+          path: AnyKernel3/*
