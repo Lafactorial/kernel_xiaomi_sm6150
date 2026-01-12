@@ -51,7 +51,6 @@
 		/* IRQF_ONESHOT | IRQF_TRIGGER_FALLING */
 		qcom,esd-err-irq-gpio = <&tlmm 32 0x2002>;
 		/* hbm off param*/
-		qcom,dispparam-f4-51-ctrl-flag;
 		qcom,mdss-dsi-panel-hbm-off-51-index = <1>;
 
 		/* DFPS */
@@ -65,7 +64,6 @@
 		/* AOD brightness setting */
 		mi,mdss-dsi-doze-hbm-brightness-value = <272>;
 		mi,mdss-dsi-doze-lbm-brightness-value = <22>;
-		qcom,mdss-dsi-oled-panel-video-mode;
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-width = <1080>;
@@ -179,8 +177,6 @@
 					05 01 00 00 0B 00 01 28
 					05 01 00 00 97 00 01 10];
 				qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
-				qcom,mdss-dsi-dispparam-dimmingon-command = [39 01 00 00 01 00 02 53 30];
-				qcom,mdss-dsi-dispparam-dimmingon-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-dimmingoff-command = [39 01 00 00 01 00 02 53 20];
 				qcom,mdss-dsi-dispparam-dimmingoff-command-state = "dsi_lp_mode";
 				qcom,mdss-dsi-dispparam-hbm-on-command = [
