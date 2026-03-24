@@ -25,7 +25,7 @@ jobs:
       uses: Keinamvy/android-kernel-actions@master
       id: build
       env:
-        NAME: VantomKernel
+        NAME: VantomKernel_KSUN
       with:
         arch: arm64
         compiler: clang/15
