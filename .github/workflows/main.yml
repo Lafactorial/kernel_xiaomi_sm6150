@@ -24,11 +24,11 @@ jobs:
       uses: Lafactorial/android-kernel-actions@master
       id: build
       env:
-        NAME: VantomKernel_KSU
+        NAME: VantomKernel
       with:
         arch: arm64
         compiler: clang/15
-        defconfig: sweet_defconfig
+        defconfig: sweet.config
         image: Image
 
     - name: Release build
